@@ -20,20 +20,11 @@
 // SOFTWARE.
 
 using System;
-using Microsoft.Extensions.Logging;
 
 namespace SIPSorcery.Net.SharpSRTP
 {
     public static class Log
     {
-        /// <summary>
-        /// Empty class only meant to be an anchor type for the logger.
-        /// </summary>
-        private class SharpSRTP { }
-
-        // wire up the sipsorcery's logger
-        private static readonly ILogger logger = LogFactory.CreateLogger<SharpSRTP>();
-
         public static bool WarnEnabled { get; set; } = true;
         public static void Warn(string message, Exception ex = null)
         {
@@ -71,10 +62,10 @@ namespace SIPSorcery.Net.SharpSRTP
             SinkInfo(message, ex);
         }
 
-        public static Action<string, Exception> SinkWarn = new Action<string, Exception>((m, ex) => { logger.LogWarning(m); });
-        public static Action<string, Exception> SinkError = new Action<string, Exception>((m, ex) => { logger.LogError(m); });
-        public static Action<string, Exception> SinkTrace = new Action<string, Exception>((m, ex) => { logger.LogTrace(m); });
-        public static Action<string, Exception> SinkDebug = new Action<string, Exception>((m, ex) => { logger.LogDebug(m); });
-        public static Action<string, Exception> SinkInfo = new Action<string, Exception>((m, ex) => { logger.LogInformation(m); });
+        public static Action<string, Exception> SinkWarn = new Action<string, Exception>((m, ex) => { System.Diagnostics.Debug.WriteLine(m); });
+        public static Action<string, Exception> SinkError = new Action<string, Exception>((m, ex) => { System.Diagnostics.Debug.WriteLine(m); });
+        public static Action<string, Exception> SinkTrace = new Action<string, Exception>((m, ex) => { System.Diagnostics.Debug.WriteLine(m); });
+        public static Action<string, Exception> SinkDebug = new Action<string, Exception>((m, ex) => { System.Diagnostics.Debug.WriteLine(m); });
+        public static Action<string, Exception> SinkInfo = new Action<string, Exception>((m, ex) => { System.Diagnostics.Debug.WriteLine(m); });
     }
 }
