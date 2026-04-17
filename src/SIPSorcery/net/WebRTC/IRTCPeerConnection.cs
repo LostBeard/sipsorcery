@@ -66,6 +66,13 @@ namespace SIPSorcery.Net
         /// and will be added to the offer SDP.
         /// </summary>
         public bool X_ExcludeIceCandidates;
+
+        /// <summary>
+        /// If set to true it indicates the generation of the SDP answer should wait until the ICE gathering
+        /// is complete so the ICE candidates can be included in the SDP answer. Required for non-trickle
+        /// signaling (e.g. WebTorrent tracker relay).
+        /// </summary>
+        public bool X_WaitForIceGatheringToComplete;
     }
 
     public class RTCSessionDescription
