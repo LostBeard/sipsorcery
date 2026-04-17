@@ -103,14 +103,26 @@ namespace SIPSorcery.Sys
 
         static NetServices()
         {
-            NetworkChange.NetworkAddressChanged += (_, _) =>
+            // Browser WASM does not support System.Net.NetworkInformation.NetworkChange —
+            // the add_NetworkAddressChanged accessor throws PlatformNotSupportedException.
+            // Use try/catch so the cctor stays compatible with net48 through net10.0 without
+            // framework-conditional compilation. WASM callers never reach the desktop code
+            // paths that consume the cached address tables, so skipping the subscription
+            // is safe there.
+            try
             {
-                // Clear cached addresses if the state of the local network interfaces change.
-                m_localAddressTable.Clear();
-                _localIPAddresses = null;
-                _internetDefaultAddress = null;
-                _internetDefaultIPv6Address = null;
-            };
+                NetworkChange.NetworkAddressChanged += (_, _) =>
+                {
+                    // Clear cached addresses if the state of the local network interfaces change.
+                    m_localAddressTable.Clear();
+                    _localIPAddresses = null;
+                    _internetDefaultAddress = null;
+                    _internetDefaultIPv6Address = null;
+                };
+            }
+            catch (PlatformNotSupportedException)
+            {
+            }
         }
 
         /// <summary>
