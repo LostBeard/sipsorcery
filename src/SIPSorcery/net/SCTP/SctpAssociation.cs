@@ -123,6 +123,34 @@ namespace SIPSorcery.Net
         /// </summary>
         public ulong SendBufferedAmount => _dataSender?.BufferedAmount ?? 0;
 
+        /// <summary>
+        /// Per-association cap on chunks sent per burst period (RFC 4960 §7.2.2).
+        /// Default = <see cref="SctpDataSender.MAX_BURST"/> (4). Raise for loopback / LAN
+        /// deployments where the RFC default caps throughput at
+        /// <c>MAX_BURST * MTU / RTT</c> below link capacity; leave at the default for any
+        /// path that might traverse the public internet (the RFC default prevents bursty
+        /// senders from overwhelming narrow links). Typical tuning for sub-10ms-RTT links:
+        /// <c>MaxBurst = 32</c>. Effect is immediate on the next burst-period tick.
+        /// </summary>
+        public int MaxBurst
+        {
+            get => _dataSender?._maxBurst ?? SctpDataSender.MAX_BURST;
+            set { if (_dataSender != null) _dataSender._maxBurst = value > 0 ? value : SctpDataSender.MAX_BURST; }
+        }
+
+        /// <summary>
+        /// Milliseconds the sender thread waits between bursts when no SACK chunks arrive
+        /// to wake it early. Default = <see cref="SctpDataSender.BURST_PERIOD_MILLISECONDS"/>
+        /// (50). Lower values (e.g. 10) can help throughput on very-low-RTT links when
+        /// paired with a raised <see cref="MaxBurst"/>. Lower than ~5 ms risks CPU churn
+        /// for negligible throughput gain.
+        /// </summary>
+        public int BurstPeriodMilliseconds
+        {
+            get => _dataSender?._burstPeriodMilliseconds ?? SctpDataSender.BURST_PERIOD_MILLISECONDS;
+            set { if (_dataSender != null) _dataSender._burstPeriodMilliseconds = value > 0 ? value : SctpDataSender.BURST_PERIOD_MILLISECONDS; }
+        }
+
         public uint VerificationTag { get; private set; }
 
         /// <summary>

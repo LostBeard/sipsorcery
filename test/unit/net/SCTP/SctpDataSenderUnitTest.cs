@@ -162,6 +162,59 @@ namespace SIPSorcery.Net.UnitTests
         }
 
         /// <summary>
+        /// Regression test for the per-association <c>_maxBurst</c> tunable added in
+        /// SpawnDev.SIPSorcery 10.0.5-rc.2. RFC 4960 §7.2.2's default <c>MAX_BURST = 4</c>
+        /// caps throughput at <c>MAX_BURST * MTU / RTT</c>, which is conservative for WAN
+        /// but under-provisioned for sub-10ms-RTT loopback/LAN. The tunable lets consumers
+        /// raise it when they know the link tolerates it. This test drives double the
+        /// workload (720 chunks vs the 360 of the baseline Reset-race benchmark) with
+        /// <c>_maxBurst = 32</c> and asserts completion still under the same 2000 ms
+        /// budget - proves the knob is plumbed (if it weren't, burstSize would stay pinned
+        /// at 4 and this test would slow down proportionally to the doubled workload).
+        /// </summary>
+        [Fact]
+        public async Task Throughput_MaxBurstTunable_ProcessesLargerQueueFaster()
+        {
+            uint arwnd = SctpAssociation.DEFAULT_ADVERTISED_RECEIVE_WINDOW;
+            ushort mtu = 1400;
+            uint initialTSN = 0;
+
+            SctpDataReceiver receiver = new SctpDataReceiver(arwnd, mtu, initialTSN);
+            SctpDataSender sender = new SctpDataSender("maxburst-probe", null, mtu, initialTSN, arwnd);
+            sender._maxBurst = 32; // default 4; tuned for loopback/LAN
+
+            Action<SctpDataChunk> doSend = (chunk) =>
+            {
+                receiver.OnDataChunk(chunk);
+                sender.GotSack(receiver.GetSackChunk());
+            };
+            sender._sendDataChunk = doSend;
+            sender.StartSending();
+
+            const int chunksToSend = 720;
+            var buffer = new byte[mtu];
+
+            var sw = Stopwatch.StartNew();
+            for (int i = 0; i < chunksToSend; i++)
+            {
+                sender.SendData(0, 0, buffer);
+            }
+
+            uint expectedAckTSN = (uint)(chunksToSend - 1);
+            while (receiver.CumulativeAckTSN != expectedAckTSN && sw.ElapsedMilliseconds < 10000)
+            {
+                await Task.Delay(5);
+            }
+            sw.Stop();
+
+            Assert.Equal(expectedAckTSN, receiver.CumulativeAckTSN);
+            Assert.True(sw.ElapsedMilliseconds < 2000,
+                $"Throughput regression: {chunksToSend * mtu} bytes took {sw.ElapsedMilliseconds} ms " +
+                $"with _maxBurst = 32. Expected the higher burst size to keep doubled workload under the " +
+                $"same 2000 ms threshold as the 360-chunk baseline.");
+        }
+
+        /// <summary>
         /// Tests that the congestion window increases in slow start mode.
         /// </summary>
         [Fact(Skip = "Regularly failing on AppVeyor CI.")]

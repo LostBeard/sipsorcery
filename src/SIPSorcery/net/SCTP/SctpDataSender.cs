@@ -36,7 +36,25 @@ namespace SIPSorcery.Net
         /// Used to limit the number of packets that are sent at any one time, i.e. when 
         /// the transmit timer fires do not send more than this many packets.
         /// </summary>
+        /// <summary>
+        /// RFC 4960 §7.2.2 default cap on chunks sent per burst period. Value retained as a
+        /// const for API back-compat and for callers that want the spec value as a baseline;
+        /// the active limit actually used by the send loop is the instance field
+        /// <see cref="_maxBurst"/>, which defaults to this value but can be tuned per-
+        /// association for deployments where the spec default is overly conservative (e.g.
+        /// loopback / LAN where MAX_BURST * MTU / RTT caps throughput below link capacity).
+        /// See <see cref="SctpAssociation.MaxBurst"/>.
+        /// </summary>
         public const int MAX_BURST = 4;
+
+        /// <summary>
+        /// Active per-association cap on chunks sent per burst period. Defaults to
+        /// <see cref="MAX_BURST"/> (4). Set higher (e.g. 32) via
+        /// <see cref="SctpAssociation.MaxBurst"/> when the link is known to be loopback /
+        /// LAN / low-latency and the RFC-default ceiling is under-provisioned. Leave at
+        /// the default for public-internet WAN paths.
+        /// </summary>
+        internal int _maxBurst = MAX_BURST;
 
         /// <summary>
         /// Milliseconds to wait between bursts if no SACK chunks are received in the interim.
@@ -544,7 +562,7 @@ namespace SIPSorcery.Net
                 // calling once per loop.
                 DateTime now = DateTime.Now;
 
-                int burstSize = (_inRetransmitMode || _inFastRecoveryMode || _congestionWindow < outstandingBytes || _receiverWindow == 0) ? 1 : MAX_BURST;
+                int burstSize = (_inRetransmitMode || _inFastRecoveryMode || _congestionWindow < outstandingBytes || _receiverWindow == 0) ? 1 : _maxBurst;
                 int chunksSent = 0;
 
                 //logger.LogTrace($"SCTP sender burst size {burstSize}, in retransmit mode {_inRetransmitMode}, cwnd {_congestionWindow}, arwnd {_receiverWindow}.");
