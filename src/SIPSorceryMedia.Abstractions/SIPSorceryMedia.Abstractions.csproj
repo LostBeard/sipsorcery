@@ -23,7 +23,7 @@
     <PackageProjectUrl>https://github.com/LostBeard/SpawnDev.RTC</PackageProjectUrl>
     <RepositoryUrl>https://github.com/LostBeard/SpawnDev.RTC.git</RepositoryUrl>
 	<PackageReadmeFile>README.md</PackageReadmeFile>
-    <Version>10.0.4-local.1</Version>
+    <Version>10.0.4</Version>
     <AssemblyVersion>10.0.4</AssemblyVersion>
     <FileVersion>10.0.4</FileVersion>
     <RepositoryBranch>master</RepositoryBranch>
