@@ -70,7 +70,8 @@
     <RepositoryType>git</RepositoryType>
     <RepositoryBranch>master</RepositoryBranch>
     <PackageTags>SIP WebRTC VoIP RTP SDP STUN ICE SIPSorcery SpawnDev Fork</PackageTags>
-    <PackageReleaseNotes>-v10.0.4-local.1 (SpawnDev fork): First release under the new PackageId SpawnDev.SIPSorcery. Content unchanged from the earlier "SIPSorcery 10.0.4-pre" fork build that was never distributed publicly. Previously bundled inside SpawnDev.RTC 1.1.1/1.1.2-rc.1 nupkgs via workaround - now shipped as a first-class package for clean nuget.org resolution.
+    <PackageReleaseNotes>-v10.0.5-rc.1 (SpawnDev fork): Fixes SctpDataSender producer-consumer lost-wakeup race that capped data-channel throughput at roughly MAX_BURST*MTU/BURST_PERIOD (~100 KB/s for MTU=1300 + default 50ms burst period) on localhost loopback, where SACKs round-trip in microseconds and the Reset-after-send window got hit almost every burst. _senderMre.Reset() moved to the TOP of DoSend's loop so Set() fired during the send work is preserved through to the next Wait(burstPeriod), which wakes the thread promptly. RFC 4960 §7.2.2 defaults unchanged. Measured on regression test SctpDataSenderUnitTest.Throughput_FastSackWake_ExceedsBurstCeiling (504 KB loopback, synchronous SACK delivery): pre-fix 5613 ms / 89.8 KB/s -> post-fix 94 ms / 5.4 MB/s (60x speedup). Unblocks SpawnDev.ILGPU.P2P's multi-MB tensor transfers. Also drops net462 from the test TFM list (fork's lowest supported is net48). Credit to Geordi for the file:line-level diagnostic before handoff.
+-v10.0.4-local.1 (SpawnDev fork): First release under the new PackageId SpawnDev.SIPSorcery. Content unchanged from the earlier "SIPSorcery 10.0.4-pre" fork build that was never distributed publicly. Previously bundled inside SpawnDev.RTC 1.1.1/1.1.2-rc.1 nupkgs via workaround - now shipped as a first-class package for clean nuget.org resolution.
 -Upstream v10.0.4-pre: New SRTP and DTLS implementation (huge thanks to @jimm98y).
 -v10.0.3: Removed null SRTP ciphers.
 -v10.0.2: Removed use of master key index for SRTP.
@@ -93,9 +94,9 @@
 -v8.0.1-pre: Performance improvements (thanks to @weltmeyer). Add ECDSA as default option for WebRTC DTLS.
 -v8.0.0: RTP header extension improvements (thanks to @ChristopheI). Major version to 8 to reflect highest .net runtime supported.</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
-    <Version>10.0.4</Version>
-    <AssemblyVersion>10.0.4</AssemblyVersion>
-    <FileVersion>10.0.4</FileVersion>
+    <Version>10.0.5-rc.1</Version>
+    <AssemblyVersion>10.0.5</AssemblyVersion>
+    <FileVersion>10.0.5</FileVersion>
     <!-- AssemblyName stays as default (SIPSorcery) - matches upstream so source code
          using SIPSorcery.* namespaces works without change on consumers swapping the
          PackageReference to SpawnDev.SIPSorcery. Namespace-level drop-in compatibility. -->
