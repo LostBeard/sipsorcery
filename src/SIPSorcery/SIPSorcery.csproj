@@ -36,6 +36,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Sibling ProjectReference during in-repo build; SpawnDev.SIPSorcery's nuspec will
+         emit a dep on SpawnDev.SIPSorceryMedia.Abstractions (renamed alongside this one
+         because upstream 8.0.12 pre-dates the AV1 codec enum that our SIPSorcery uses). -->
     <ProjectReference Include="..\SIPSorceryMedia.Abstractions\SIPSorceryMedia.Abstractions.csproj" />
   </ItemGroup>
 
@@ -48,26 +51,27 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- Disable warning for missing XML doc comments. -->
     <NoWarn>$(NoWarn);CS1591;CS1573;CS1587</NoWarn>
-    <Authors>Aaron Clauson, Christophe Irles, Rafael Soares &amp; Contributors</Authors>
-    <Copyright>Copyright © 2010-2026 Aaron Clauson</Copyright>
+    <Authors>LostBeard (fork of sipsorcery-org/sipsorcery by Aaron Clauson, Christophe Irles, Rafael Soares &amp; Contributors)</Authors>
+    <Copyright>Copyright © 2010-2026 Aaron Clauson; fork modifications © 2026 LostBeard</Copyright>
     <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
-    <Title>SIPSorcery</Title>
-    <Summary>A cross platform C# .NET library for SIP, VoIP and WebRTC.</Summary>
-    <Description>Real-time communications library with full support for the Session Initiation Protocol (SIP) and WebRTC. No wrappers and no native libraries required.
+    <Title>SpawnDev.SIPSorcery</Title>
+    <Summary>SpawnDev's fork of SIPSorcery with targeted browser-WebRTC interop fixes. Namespace and AssemblyName match upstream for drop-in compatibility.</Summary>
+    <Description>SpawnDev's fork of SIPSorcery. Drop-in-compatible: namespace (SIPSorcery.*) and AssemblyName (SIPSorcery) are unchanged from upstream. Modifications: SRTP profiles restricted to browser-compatible set (AEAD_AES_128_GCM, AEAD_AES_256_GCM, AES128_CM_HMAC_SHA1_80), proven BouncyCastle DTLS stack preserved instead of SharpSRTP rewrite for Chrome/Firefox/Edge interop, WaitForIceGatheringToComplete option for trickle-less signaling, NetServices cctor guard for browser WASM. Used by SpawnDev.RTC; install directly if you want the same fixes.
     </Description>
-    <Company>SIP Sorcery PTY LTD</Company>
-    <Product>SIPSorcery</Product>
-    <PackageId>SIPSorcery</PackageId>
+    <Company>SIP Sorcery PTY LTD (original), LostBeard (fork)</Company>
+    <Product>SpawnDev.SIPSorcery</Product>
+    <PackageId>SpawnDev.SIPSorcery</PackageId>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageProjectUrl>https://sipsorcery-org.github.io/sipsorcery/</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/LostBeard/SpawnDev.RTC</PackageProjectUrl>
     <PackageIconUrl>http://www.sipsorcery.com/mainsite/favicon.ico</PackageIconUrl>
     <PackageIcon>icon.png</PackageIcon>
-    <RepositoryUrl>https://github.com/sipsorcery-org/sipsorcery</RepositoryUrl>
+    <RepositoryUrl>https://github.com/LostBeard/SpawnDev.RTC.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <RepositoryBranch>master</RepositoryBranch>
-    <PackageTags>SIP WebRTC VoIP RTP SDP STUN ICE SIPSorcery</PackageTags>
-    <PackageReleaseNotes>-v10.0.4-pre: New SRTP and DTLS implementation (huge thanks to @jimm98y).
+    <PackageTags>SIP WebRTC VoIP RTP SDP STUN ICE SIPSorcery SpawnDev Fork</PackageTags>
+    <PackageReleaseNotes>-v10.0.4-local.1 (SpawnDev fork): First release under the new PackageId SpawnDev.SIPSorcery. Content unchanged from the earlier "SIPSorcery 10.0.4-pre" fork build that was never distributed publicly. Previously bundled inside SpawnDev.RTC 1.1.1/1.1.2-rc.1 nupkgs via workaround - now shipped as a first-class package for clean nuget.org resolution.
+-Upstream v10.0.4-pre: New SRTP and DTLS implementation (huge thanks to @jimm98y).
 -v10.0.3: Removed null SRTP ciphers.
 -v10.0.2: Removed use of master key index for SRTP.
 -v10.0.1: Support for .NET 10.0 added.
@@ -89,9 +93,12 @@
 -v8.0.1-pre: Performance improvements (thanks to @weltmeyer). Add ECDSA as default option for WebRTC DTLS.
 -v8.0.0: RTP header extension improvements (thanks to @ChristopheI). Major version to 8 to reflect highest .net runtime supported.</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
-    <Version>10.0.4-pre</Version>
+    <Version>10.0.4-local.1</Version>
     <AssemblyVersion>10.0.4</AssemblyVersion>
     <FileVersion>10.0.4</FileVersion>
+    <!-- AssemblyName stays as default (SIPSorcery) - matches upstream so source code
+         using SIPSorcery.* namespaces works without change on consumers swapping the
+         PackageReference to SpawnDev.SIPSorcery. Namespace-level drop-in compatibility. -->
   </PropertyGroup>
 
   <PropertyGroup Label="SourceLink">

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>SIPSorceryMedia.Abstractions</PackageId>
+    <PackageId>SpawnDev.SIPSorceryMedia.Abstractions</PackageId>
     <TargetFrameworks>net48;net8.0;net9.0;net10.0</TargetFrameworks>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -10,23 +10,22 @@
     <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
 	<SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
 	<TreatWarningsAsErrors>True</TreatWarningsAsErrors>
-    <Authors>Aaron Clauson</Authors>
-    <Copyright>Copyright © 2020-2025 Aaron Clauson</Copyright>
-    <Company>SIP Sorcery PTY LTD</Company>
+    <Authors>LostBeard (fork of sipsorcery-org/sipsorcery by Aaron Clauson)</Authors>
+    <Copyright>Copyright © 2020-2026 Aaron Clauson; fork modifications © 2026 LostBeard</Copyright>
+    <Company>SIP Sorcery PTY LTD (original), LostBeard (fork)</Company>
     <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
-    <Title>SIPSorceryMedia.Abstractions</Title>
-    <Summary>A set of interfaces and common structures used for building media end points for the SIPSorcery library.</Summary>
-    <Description>Don't reference this package unless you are building a media end point to work with the SIPSorcery real-time communications library. In most cases a concrete implementation package such as SIPSorceryMedia.Windows should be referenced.
-    </Description>
-    <Product>SIPSorceryMedia.Abstractions</Product>
+    <Title>SpawnDev.SIPSorceryMedia.Abstractions</Title>
+    <Summary>SpawnDev's fork of SIPSorceryMedia.Abstractions. Carries upstream code additions (including VideoCodecsEnum.AV1) that post-date the public 8.0.12 release. Paired with SpawnDev.SIPSorcery.</Summary>
+    <Description>SpawnDev's fork of SIPSorceryMedia.Abstractions. Namespace (SIPSorceryMedia.*) and AssemblyName (SIPSorceryMedia.Abstractions) unchanged from upstream - drop-in compatible. Tracks upstream main branch code ahead of the 8.0.12 public nuget.org release (needed because SpawnDev.SIPSorcery uses codecs like AV1 that are only in post-8.0.12 upstream commits).</Description>
+    <Product>SpawnDev.SIPSorceryMedia.Abstractions</Product>
     <PackageIconUrl>http://www.sipsorcery.com/mainsite/favicon.ico</PackageIconUrl>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageProjectUrl></PackageProjectUrl>
-    <RepositoryUrl>https://github.com/sipsorcery/SIPSorceryMedia.Abstractions</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/LostBeard/SpawnDev.RTC</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/LostBeard/SpawnDev.RTC.git</RepositoryUrl>
 	<PackageReadmeFile>README.md</PackageReadmeFile>
-    <Version>8.0.12</Version>
-    <AssemblyVersion>8.0.12</AssemblyVersion>
-    <FileVersion>8.0.12</FileVersion>
+    <Version>10.0.4-local.1</Version>
+    <AssemblyVersion>10.0.4</AssemblyVersion>
+    <FileVersion>10.0.4</FileVersion>
     <RepositoryBranch>master</RepositoryBranch>
     <PackageTags>WebRTC VoIP SIPSorcery Media</PackageTags>
     <PackageReleaseNotes>-v8.0.12: Added IAudioEndPoint and GotEncodedMediaFrame to IAudioSink.
