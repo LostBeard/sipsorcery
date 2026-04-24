@@ -70,9 +70,9 @@
     <RepositoryType>git</RepositoryType>
     <RepositoryBranch>master</RepositoryBranch>
     <PackageTags>SIP WebRTC VoIP RTP SDP STUN ICE SIPSorcery SpawnDev Fork</PackageTags>
-    <PackageReleaseNotes>v10.0.5-rc.4 (SpawnDev fork): Adds TurnServerConfig.RelayPortRangeStart/End - constrains per-allocation relay-socket ports to a configured range instead of the OS ephemeral pool. Required for NAT port-forwarding deployments where only a bounded UDP range is forwarded from the router to the TURN host. Default 0 = OS ephemeral (backward compatible). Builds on rc.3's ResolveHmacKey resolver hook. Full changelog: see CHANGELOG.md in the repo.</PackageReleaseNotes>
+    <PackageReleaseNotes>v10.0.5 (SpawnDev fork): Production-TURN extensions for browser-interop WebRTC deployments. (1) TurnServerConfig.ResolveHmacKey - per-request HMAC-SHA1 key resolver for ephemeral / REST-API TURN credentials (RFC 8489 §9.2 pattern, Twilio/Cloudflare/coturn --use-auth-secret). (2) TurnServerConfig.RelayPortRangeStart/End - bounded relay-socket port range for NAT port-forwarding (matches coturn --min-port/--max-port). (3) SctpAssociation.MaxBurst + BurstPeriodMilliseconds - per-association SCTP burst tunables (RFC 4960 §7.2.2) for throughput-sensitive data-channel deployments. (4) SctpDataSender producer-consumer lost-wakeup race fix (60x speedup on localhost loopback / fast-SACK paths). All backward-compatible defaults. Burned in at hub.spawndev.com. Full changelog: see CHANGELOG.md in the repo.</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
-    <Version>10.0.5-rc.4</Version>
+    <Version>10.0.5</Version>
     <AssemblyVersion>10.0.5</AssemblyVersion>
     <FileVersion>10.0.5</FileVersion>
     <!-- AssemblyName stays as default (SIPSorcery) - matches upstream so source code
