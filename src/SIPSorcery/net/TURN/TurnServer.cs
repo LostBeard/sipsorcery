@@ -80,6 +80,56 @@ namespace SIPSorcery.Net
         /// Default allocation lifetime in seconds. Default is 600 (10 minutes).
         /// </summary>
         public int DefaultLifetimeSeconds { get; set; } = 600;
+
+        /// <summary>
+        /// Optional: per-request HMAC-SHA1 key resolver for ephemeral / rotating /
+        /// REST-API-issued credentials (RFC 8489 Section 9.2, the "TURN REST API"
+        /// pattern used by Twilio, Cloudflare, coturn's <c>--use-auth-secret</c>).
+        /// <para>
+        /// When set, the server looks up the HMAC key for each incoming request's
+        /// STUN <c>USERNAME</c> attribute by invoking the delegate with that
+        /// username string. Returning <c>null</c> rejects the request with 401
+        /// Unauthorized. Returning a 20-byte (or other length) key validates
+        /// MESSAGE-INTEGRITY against it; the same key signs the outbound response.
+        /// </para>
+        /// <para>
+        /// When <c>null</c> (default), the server falls back to the classic RFC 5389
+        /// long-term-credential path using the static <see cref="Username"/> /
+        /// <see cref="Realm"/> / <see cref="Password"/> triple configured above
+        /// (existing behavior is unchanged).
+        /// </para>
+        /// <para>
+        /// Typical use: the app backend hands out time-limited credentials of the
+        /// form <c>(username=&quot;{expiry}:{userId}&quot;, password=Base64(HMAC-SHA1(secret, username)))</c>.
+        /// The TURN server is configured with a resolver that computes the same
+        /// HMAC from its shared secret and returns <c>MD5(username:realm:password)</c>
+        /// - the long-term-credential key SipSorcery's MESSAGE-INTEGRITY path
+        /// requires - or returns <c>null</c> if the expiry has passed.
+        /// </para>
+        /// </summary>
+#nullable enable
+        public Func<string, byte[]?>? ResolveHmacKey { get; set; }
+#nullable restore
+
+        /// <summary>
+        /// Inclusive lower bound for the relay-socket port range. Per-allocation
+        /// relay sockets are bound within
+        /// [<see cref="RelayPortRangeStart"/>, <see cref="RelayPortRangeEnd"/>]
+        /// instead of the OS-assigned ephemeral range. Set both ends to make
+        /// relay ports predictable for NAT port-forwarding deployments.
+        /// <para>
+        /// Default 0 means "no range configured - use OS ephemeral" (existing
+        /// behavior; relay socket is bound to <c>IPAddress.Any:0</c>).
+        /// </para>
+        /// </summary>
+        public int RelayPortRangeStart { get; set; } = 0;
+
+        /// <summary>
+        /// Inclusive upper bound for the relay-socket port range. See
+        /// <see cref="RelayPortRangeStart"/>. Must be >= Start when both are set.
+        /// Default 0 means "no range configured".
+        /// </summary>
+        public int RelayPortRangeEnd { get; set; } = 0;
     }
 
     /// <summary>
@@ -526,10 +576,19 @@ namespace SIPSorcery.Net
             var msgType = msg.Header.MessageType;
             logger.LogDebug("TURN {Type} from {Client}.", msgType, clientId);
 
+            // Resolve the per-request HMAC key. For classic long-term credentials
+            // (default) this returns the precomputed _hmacKey. When a caller has
+            // plugged in TurnServerConfig.ResolveHmacKey, the resolver is invoked
+            // with the request's USERNAME attribute to support ephemeral /
+            // rotating / REST-API-issued credentials. A null result is treated
+            // below as "reject with 401 Unauthorized".
+            var hmacKey = ResolveHmacKeyForRequest(msg);
+
             switch (msgType)
             {
                 case STUNMessageTypesEnum.BindingRequest:
                     {
+                        // Binding requests are unauthenticated per RFC 5389.
                         var response = HandleBindingRequest(msg);
                         var bytes = response.ToByteBuffer(null, false);
                         _ = sendResponse(bytes);
@@ -538,11 +597,14 @@ namespace SIPSorcery.Net
 
                 case STUNMessageTypesEnum.Allocate:
                     {
-                        var (response, needsAuth) = HandleAllocate(msg, rawBytes, clientId,
+                        var (response, needsAuth) = HandleAllocate(msg, rawBytes, clientId, hmacKey,
                             tcpStream, udpClientEndPoint, udpControlSocket,
                             ref allocation);
-                        var bytes = needsAuth
-                            ? response.ToByteBuffer(_hmacKey, true)
+                        // Sign outbound with the same key we validated inbound against.
+                        // When needsAuth is false (initial 401 challenge or 400 error)
+                        // we don't include MESSAGE-INTEGRITY in the response.
+                        var bytes = needsAuth && hmacKey != null
+                            ? response.ToByteBuffer(hmacKey, true)
                             : response.ToByteBuffer(null, false);
                         _ = sendResponse(bytes);
                     }
@@ -551,7 +613,9 @@ namespace SIPSorcery.Net
                 case STUNMessageTypesEnum.Refresh:
                     {
                         var response = HandleRefresh(msg, clientId, ref allocation);
-                        var bytes = response.ToByteBuffer(_hmacKey, true);
+                        var bytes = hmacKey != null
+                            ? response.ToByteBuffer(hmacKey, true)
+                            : response.ToByteBuffer(null, false);
                         _ = sendResponse(bytes);
                     }
                     break;
@@ -559,7 +623,9 @@ namespace SIPSorcery.Net
                 case STUNMessageTypesEnum.CreatePermission:
                     {
                         var response = HandleCreatePermission(msg, allocation);
-                        var bytes = response.ToByteBuffer(_hmacKey, true);
+                        var bytes = hmacKey != null
+                            ? response.ToByteBuffer(hmacKey, true)
+                            : response.ToByteBuffer(null, false);
                         _ = sendResponse(bytes);
                     }
                     break;
@@ -567,7 +633,9 @@ namespace SIPSorcery.Net
                 case STUNMessageTypesEnum.ChannelBind:
                     {
                         var response = HandleChannelBind(msg, allocation);
-                        var bytes = response.ToByteBuffer(_hmacKey, true);
+                        var bytes = hmacKey != null
+                            ? response.ToByteBuffer(hmacKey, true)
+                            : response.ToByteBuffer(null, false);
                         _ = sendResponse(bytes);
                     }
                     break;
@@ -582,6 +650,73 @@ namespace SIPSorcery.Net
             }
         }
 
+        /// <summary>
+        /// Resolve the HMAC-SHA1 key used to validate MESSAGE-INTEGRITY on this
+        /// request and sign its response. When <see cref="TurnServerConfig.ResolveHmacKey"/>
+        /// is null, returns the static long-term-credential key precomputed at
+        /// construction. When a resolver is configured, extracts the USERNAME
+        /// attribute and passes it to the resolver. Returns null if no USERNAME
+        /// is present or the resolver rejects it - callers should treat null as
+        /// an unauthenticated state.
+        /// </summary>
+#nullable enable
+        private byte[]? ResolveHmacKeyForRequest(STUNMessage request)
+        {
+            if (_config.ResolveHmacKey == null) return _hmacKey;
+
+            var usernameAttr = request.Attributes.FirstOrDefault(
+                a => a.AttributeType == STUNAttributeTypesEnum.Username);
+            if (usernameAttr == null || usernameAttr.Value == null) return null;
+
+            var username = Encoding.UTF8.GetString(usernameAttr.Value);
+            return _config.ResolveHmacKey(username);
+        }
+#nullable restore
+
+        /// <summary>
+        /// Create a UDP relay socket honoring <see cref="TurnServerConfig.RelayPortRangeStart"/>
+        /// / <see cref="TurnServerConfig.RelayPortRangeEnd"/>. When the range is
+        /// unset (both = 0), falls back to port 0 (OS ephemeral assignment) for
+        /// legacy behavior. When set, walks the range from a random starting
+        /// offset and binds on the first free port; if all are in use, falls
+        /// back to OS ephemeral rather than fail the Allocate.
+        /// </summary>
+        private UdpClient CreateRelaySocket()
+        {
+            var start = _config.RelayPortRangeStart;
+            var end = _config.RelayPortRangeEnd;
+
+            if (start <= 0 || end <= 0 || end < start)
+            {
+                // No range configured or invalid range - fall back to OS ephemeral.
+                return new UdpClient(new IPEndPoint(IPAddress.Any, 0));
+            }
+
+            // Walk the range from a random offset so concurrent allocations don't
+            // always collide on the low end. Limited to rangeSize attempts total.
+            var rangeSize = end - start + 1;
+            var startOffset = _rng.Next(rangeSize);
+            for (int i = 0; i < rangeSize; i++)
+            {
+                var port = start + ((startOffset + i) % rangeSize);
+                try
+                {
+                    return new UdpClient(new IPEndPoint(IPAddress.Any, port));
+                }
+                catch (SocketException)
+                {
+                    // Port in use - try the next one.
+                }
+            }
+
+            logger.LogWarning(
+                "TURN: relay port range {Start}-{End} exhausted; falling back to OS ephemeral.",
+                start, end);
+            return new UdpClient(new IPEndPoint(IPAddress.Any, 0));
+        }
+
+        private readonly Random _rng = new Random();
+
         private STUNMessage HandleBindingRequest(STUNMessage request)
         {
             var response = new STUNMessage(STUNMessageTypesEnum.BindingSuccessResponse);
@@ -590,15 +725,18 @@ namespace SIPSorcery.Net
             return response;
         }
 
+#nullable enable
         private (STUNMessage response, bool needsAuth) HandleAllocate(
             STUNMessage request,
             byte[] rawBytes,
             string clientId,
+            byte[]? hmacKey,
             NetworkStream tcpStream,
             IPEndPoint udpClientEndPoint,
             UdpClient udpControlSocket,
             ref TurnAllocation allocation)
         {
+#nullable restore
             // Check for MESSAGE-INTEGRITY — first request won't have it
             var hasIntegrity = request.Attributes.Any(
                 a => a.AttributeType == STUNAttributeTypesEnum.MessageIntegrity);
@@ -616,11 +754,23 @@ namespace SIPSorcery.Net
                 return (errResponse, false);
             }
 
+            // Reject if the resolver returned no key — unknown / expired / unauthorized username.
+            // Applies both to the static long-term path (when _hmacKey was somehow null) and to
+            // the dynamic ResolveHmacKey path (ephemeral credentials, REST-API auth, etc.).
+            if (hmacKey == null)
+            {
+                logger.LogWarning("TURN Allocate: no HMAC key resolved for {Client} (unknown/expired username).", clientId);
+                var errResponse = new STUNMessage(STUNMessageTypesEnum.AllocateErrorResponse);
+                errResponse.Header.TransactionId = request.Header.TransactionId;
+                errResponse.Attributes.Add(BuildErrorCodeAttribute(401, "Unauthorized"));
+                return (errResponse, false);
+            }
+
             // Verify MESSAGE-INTEGRITY manually on the raw bytes.
             // SIPSorcery's CheckIntegrity() requires a valid FINGERPRINT as the last attribute
             // (isFingerprintValid guard), which browsers may not send for TURN messages.
             // See: https://github.com/sipsorcery-org/sipsorcery/pull/1510
-            if (!VerifyMessageIntegrity(rawBytes, _hmacKey))
+            if (!VerifyMessageIntegrity(rawBytes, hmacKey))
             {
                 logger.LogWarning("TURN Allocate: integrity check failed from {Client}.", clientId);
                 var errResponse = new STUNMessage(STUNMessageTypesEnum.AllocateErrorResponse);
@@ -638,8 +788,12 @@ namespace SIPSorcery.Net
                 return (errResponse, true);
             }
 
-            // Create UDP relay socket
-            var relaySocket = new UdpClient(new IPEndPoint(IPAddress.Any, 0));
+            // Create UDP relay socket. When RelayPortRangeStart/End are set, pick
+            // a port from that range instead of the OS ephemeral range - needed
+            // for NAT port-forwarding deployments where only a known range is
+            // forwarded to the host. Falls back to port 0 (OS ephemeral) when
+            // the range is unset or exhausted under contention.
+            var relaySocket = CreateRelaySocket();
             var relayEndpoint = (IPEndPoint)relaySocket.Client.LocalEndPoint;
 
             allocation = new TurnAllocation
