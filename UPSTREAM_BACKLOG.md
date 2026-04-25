@@ -59,6 +59,29 @@ Drop-in extension point - existing `TurnServerConfig` consumers see no API chang
 
 **When to propose:** after hub.spawndev.com runs this for 2+ weeks with real WebRTC traffic. Burn-in gives us production data to cite in the PR description.
 
+### `MediaStreamTrack.StreamStatus` - public setter
+
+**Added:** 2026-04-25 (fork 10.0.5-rc.5)
+**Files:** `src/SIPSorcery/net/RTP/Streams/MediaStreamTrack.cs` (one-character setter visibility change)
+
+**What:**
+- `MediaStreamTrack.StreamStatus` setter changed from `internal` to `public`.
+- Strict superset of upstream surface - existing `internal` callers continue to work, public callers can now adjust direction post-construction without reflection.
+
+**Why:**
+The `internal` setter forced consumers to either (a) recreate the track every time direction needed to change (e.g. flipping a `RecvOnly` track to `SendRecv` after a remote DTLS handshake completes and we know the peer is actually sending), or (b) reach in via reflection. Recreating the track triggers SDP renegotiation churn; reflection is brittle. There's no reason for the setter to be hidden - the property already exposes the field's value through the getter, the setter just lets you set what you can already read.
+
+**Shape:**
+One-line modifier change. Zero behavior change for code that doesn't touch the setter; new affordance for code that does. Same property name, same type, same getter semantics.
+
+**Upstream readiness:**
+- [x] Fork compiles clean
+- [x] Backward compatible (no existing caller affected; tests pass unchanged)
+- [ ] Add a matching unit test inside SIPSorcery's own `test/` tree (assert public setter actually flips StreamStatus + the change is visible to anyone who reads it back)
+- [ ] One-PR-per-7-14-days pace rule: queue behind any TURN-side PRs we still owe
+
+**When to propose:** ride along with the next batch (TURN PRs are higher-leverage - this can hitchhike on whichever quarter goes upstream first).
+
 ## Local-only (no upstream plans)
 
 ### SRTP profile restrictions (browser-compatible only)

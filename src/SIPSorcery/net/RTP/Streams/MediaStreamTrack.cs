@@ -94,9 +94,15 @@ namespace SIPSorcery.Net
         public MediaStreamStatusEnum DefaultStreamStatus { get; private set; }
 
         /// <summary>
-        /// Holds the stream state of the track.
+        /// Holds the stream state of the track. Public setter (SpawnDev fork modification)
+        /// so consumers can adjust direction post-construction without reflection. The
+        /// upstream `internal` setter forced a fresh track instance for any direction change
+        /// (e.g. flipping a recvonly track to sendrecv after a remote DTLS handshake), which
+        /// triggered SDP renegotiation churn even when only the local hint changed. This
+        /// is a strict superset of the upstream surface - existing internal callers continue
+        /// to work, public callers now see what was already there.
         /// </summary>
-        public MediaStreamStatusEnum StreamStatus { get; internal set; }
+        public MediaStreamStatusEnum StreamStatus { get; set; }
 
         /// <summary>
         /// If the SDP remote the remote party provides "a=ssrc" attributes, as specified
