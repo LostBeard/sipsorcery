@@ -70,11 +70,11 @@
     <RepositoryType>git</RepositoryType>
     <RepositoryBranch>master</RepositoryBranch>
     <PackageTags>SIP WebRTC VoIP RTP SDP STUN ICE SIPSorcery SpawnDev Fork</PackageTags>
-    <PackageReleaseNotes>v10.0.5 (SpawnDev fork): Production-TURN extensions for browser-interop WebRTC deployments. (1) TurnServerConfig.ResolveHmacKey - per-request HMAC-SHA1 key resolver for ephemeral / REST-API TURN credentials (RFC 8489 §9.2 pattern, Twilio/Cloudflare/coturn --use-auth-secret). (2) TurnServerConfig.RelayPortRangeStart/End - bounded relay-socket port range for NAT port-forwarding (matches coturn --min-port/--max-port). (3) SctpAssociation.MaxBurst + BurstPeriodMilliseconds - per-association SCTP burst tunables (RFC 4960 §7.2.2) for throughput-sensitive data-channel deployments. (4) SctpDataSender producer-consumer lost-wakeup race fix (60x speedup on localhost loopback / fast-SACK paths). All backward-compatible defaults. Burned in at hub.spawndev.com. Full changelog: see CHANGELOG.md in the repo.</PackageReleaseNotes>
+    <PackageReleaseNotes>v10.0.6 (SpawnDev fork): Single additive change on top of 10.0.5 - `MediaStreamTrack.StreamStatus` setter widened from `internal` to `public`. Lets consumers like `SpawnDev.MultiMedia` set the W3C `MediaStreamTrack.enabled`-equivalent state from outside the `SIPSorcery.*` namespace without reflection or wrapper indirection. Zero behavior change otherwise; the field's existing internal callers still set it the same way. Source: commit `c4b5f79e8` on the LostBeard/sipsorcery fork. Ships with the SpawnDev.RTC 1.1.8 stable cut so consumers picking up the RTC rollup get the widening transitively. v10.0.5 changelog (Production-TURN extensions: TurnServerConfig.ResolveHmacKey + RelayPortRangeStart/End, SctpAssociation.MaxBurst + BurstPeriodMilliseconds, SctpDataSender producer-consumer lost-wakeup race fix) is still in 10.0.6 - this is purely additive.</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
-    <Version>10.0.5</Version>
-    <AssemblyVersion>10.0.5</AssemblyVersion>
-    <FileVersion>10.0.5</FileVersion>
+    <Version>10.0.6</Version>
+    <AssemblyVersion>10.0.6</AssemblyVersion>
+    <FileVersion>10.0.6</FileVersion>
     <!-- AssemblyName stays as default (SIPSorcery) - matches upstream so source code
          using SIPSorcery.* namespaces works without change on consumers swapping the
          PackageReference to SpawnDev.SIPSorcery. Namespace-level drop-in compatibility. -->
