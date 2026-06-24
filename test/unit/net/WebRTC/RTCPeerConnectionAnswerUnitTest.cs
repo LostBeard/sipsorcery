@@ -89,5 +89,69 @@ namespace SIPSorcery.Net.UnitTests
             offerer.close();
             answerer.close();
         }
+
+        /// <summary>
+        /// Tests that when the remote OFFER requests a=setup:active (the offerer wants to be the
+        /// DTLS client), createAnswer responds with a=setup:passive (we become the DTLS server).
+        /// Per RFC 4145 Section 4.1 / RFC 5763 Section 5 the answerer's role is dictated by the
+        /// offerer's setup attribute. Regression for a hardcoded answerer role that produced two
+        /// DTLS clients (both sending ClientHello -> unexpected_message(10)) against an offerer
+        /// that explicitly requested setup:active (e.g. the SpawnWear watch / libpeer).
+        /// </summary>
+        [Fact]
+        public void AnswerToActiveSetupOfferIsPassive()
+        {
+            // Create an offerer with a video track, then force its offer to request setup:active.
+            RTCPeerConnection offerer = new RTCPeerConnection(null);
+            var videoTrack = new MediaStreamTrack(
+                SDPMediaTypesEnum.video, false,
+                new List<SDPAudioVideoMediaFormat>
+                {
+                    new SDPAudioVideoMediaFormat(SDPMediaTypesEnum.video, 96, "VP8", 90000)
+                });
+            offerer.addTrack(videoTrack);
+
+            var offer = offerer.createOffer(new RTCOfferOptions());
+            Assert.NotNull(offer?.sdp);
+
+            // Default offers are setup:actpass; rewrite to setup:active so the offerer is the DTLS client.
+            var activeOfferSdp = offer.sdp.Replace("a=setup:actpass", "a=setup:active");
+            Assert.Contains("a=setup:active", activeOfferSdp);
+            Assert.DoesNotContain("a=setup:actpass", activeOfferSdp);
+
+            logger.LogDebug("Active offer SDP:\n{Sdp}", activeOfferSdp);
+
+            // Create an answerer, set the (active) remote offer, then create the answer.
+            RTCPeerConnection answerer = new RTCPeerConnection(null);
+            var answerVideoTrack = new MediaStreamTrack(
+                SDPMediaTypesEnum.video, false,
+                new List<SDPAudioVideoMediaFormat>
+                {
+                    new SDPAudioVideoMediaFormat(SDPMediaTypesEnum.video, 96, "VP8", 90000)
+                });
+            answerer.addTrack(answerVideoTrack);
+
+            var setResult = answerer.setRemoteDescription(
+                new RTCSessionDescriptionInit { type = RTCSdpType.offer, sdp = activeOfferSdp });
+            Assert.Equal(SetDescriptionResultEnum.OK, setResult);
+
+            var answer = answerer.createAnswer();
+            Assert.NotNull(answer?.sdp);
+
+            logger.LogDebug("Answer SDP:\n{Sdp}", answer.sdp);
+
+            // Every answer media announcement must be setup:passive (we are the DTLS server).
+            SDP answerSdp = SDP.ParseSDPDescription(answer.sdp);
+            Assert.NotEmpty(answerSdp.Media);
+            foreach (var media in answerSdp.Media)
+            {
+                Assert.Equal(IceRolesEnum.passive, media.IceRole);
+            }
+            Assert.Contains("a=setup:passive", answer.sdp);
+            Assert.DoesNotContain("a=setup:active", answer.sdp);
+
+            offerer.close();
+            answerer.close();
+        }
     }
 }

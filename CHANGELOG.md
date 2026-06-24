@@ -6,6 +6,19 @@ Format: version entries newest first, SpawnDev-fork lines only unless explicitly
 
 ---
 
+## [10.0.7] - SpawnDev fork - 2026-06-24
+
+### Fixed
+- **Answerer DTLS role now honors the offerer's `a=setup` (RFC 4145 §4.1 / RFC 5763 §5).** When `RTCPeerConnection.SetRemoteDescription` processes an incoming OFFER it previously hardcoded `IceRole = active` (DTLS client), ignoring the offer's setup attribute. An offerer that explicitly requested `setup:active` was answered `setup:active` too -> two DTLS clients, both sending a ClientHello -> each rejected the other's as `unexpected_message(10)`, failing the handshake instantly. The answerer now mirrors the offer: `remoteIceRole == active ? passive : active` (offer `active` -> we are DTLS server; offer `passive` -> we are DTLS client; offer `actpass`/absent -> `active` as before, so the common browser-offer path is unchanged).
+
+### Rationale
+The SpawnWear watch (libpeer) forces itself to DTLS client (`setup:active`) because an mbedTLS server cannot reassemble the fragmented ClientHello a browser sends; a browser answerer correctly responds `setup:passive`, but the desktop SipSorcery answerer did not, which broke the watch-to-desktop (console) WebRTC path. Verified end-to-end on hardware.
+
+### Tests
+- Unit `RTCPeerConnectionAnswerUnitTest.AnswerToActiveSetupOfferIsPassive` (net8/9/10/net48).
+- Integration `RTCPeerConnectionUnitTest.CheckDataChannelEstablishmentWithActiveOffer` - two loopback peers, offerer `setup:active`, full ICE+DTLS+SCTP+data-channel completes.
+- Dropped the dead `net462` target from the integration test project (the fork targets net8.0/net9.0/net10.0/net48).
+
 ## [10.0.5-rc.4] - SpawnDev fork - 2026-04-24
 
 ### Added

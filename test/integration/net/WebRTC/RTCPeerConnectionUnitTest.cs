@@ -950,6 +950,72 @@ a=rtpmap:126 telephone-event/8000";
         }
 
         /// <summary>
+        /// Tests that two peers establish a data channel when the OFFER explicitly requests
+        /// a=setup:active (the offerer is the DTLS client), so the answerer must become the DTLS
+        /// server (a=setup:passive). Regression for the answerer hardcoding setup:active, which
+        /// produced two DTLS clients (both sending ClientHello -> unexpected_message(10)) and the
+        /// data channel never opening. This reproduces the SpawnWear watch (libpeer offers
+        /// setup:active) connecting to a desktop SipSorcery answerer, with no hardware.
+        /// </summary>
+        [Fact]
+        public async Task CheckDataChannelEstablishmentWithActiveOffer()
+        {
+            logger.LogDebug("--> {MethodName}", System.Reflection.MethodBase.GetCurrentMethod().Name);
+            logger.BeginScope(System.Reflection.MethodBase.GetCurrentMethod().Name);
+
+            var aliceDataConnected = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var bobDataOpened = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            // Alice is the offerer and will be the DTLS client (setup:active).
+            var alice = new RTCPeerConnection();
+            var dc = await alice.createDataChannel("dc1", null);
+            dc.onopen += () => aliceDataConnected.TrySetResult(true);
+            var aliceOffer = alice.createOffer();
+            await alice.setLocalDescription(aliceOffer);
+
+            // Rewrite the offer to explicitly request setup:active (as the watch / libpeer does).
+            var activeOfferSdp = aliceOffer.sdp.Replace("a=setup:actpass", "a=setup:active");
+            Assert.Contains("a=setup:active", activeOfferSdp);
+            Assert.DoesNotContain("a=setup:actpass", activeOfferSdp);
+            var activeOffer = new RTCSessionDescriptionInit { type = RTCSdpType.offer, sdp = activeOfferSdp };
+
+            logger.LogDebug("alice active offer: {Sdp}", activeOfferSdp);
+
+            // Bob is the answerer; for a setup:active offer he MUST answer setup:passive (DTLS server).
+            var bob = new RTCPeerConnection();
+            RTCDataChannel bobData = null;
+            bob.ondatachannel += (chan) =>
+            {
+                bobData = chan;
+                bobDataOpened.TrySetResult(true);
+            };
+
+            var setOfferResult = bob.setRemoteDescription(activeOffer);
+            Assert.Equal(SetDescriptionResultEnum.OK, setOfferResult);
+
+            var bobAnswer = bob.createAnswer();
+            Assert.Contains("a=setup:passive", bobAnswer.sdp);
+            Assert.DoesNotContain("a=setup:active", bobAnswer.sdp);
+            await bob.setLocalDescription(bobAnswer);
+            var setAnswerResult = alice.setRemoteDescription(bobAnswer);
+            Assert.Equal(SetDescriptionResultEnum.OK, setAnswerResult);
+
+            logger.LogDebug("answer: {BobAnswerSdp}", bobAnswer.sdp);
+
+            await Task.WhenAny(Task.WhenAll(aliceDataConnected.Task, bobDataOpened.Task), Task.Delay(5000));
+
+            Assert.True(aliceDataConnected.Task.IsCompleted, "Alice (DTLS client) data channel did not open - DTLS handshake failed.");
+            Assert.True(await aliceDataConnected.Task);
+            Assert.True(bobDataOpened.Task.IsCompleted, "Bob (DTLS server) did not receive the data channel - DTLS handshake failed.");
+            Assert.True(await bobDataOpened.Task);
+            Assert.True(dc.IsOpened);
+            Assert.True(bobData.IsOpened);
+
+            bob.close();
+            alice.close();
+        }
+
+        /// <summary>
         /// Checks that the correct answer is generated for an SDP offer from GStreamer.
         /// </summary>
         [Fact]

@@ -702,8 +702,17 @@ namespace SIPSorcery.Net
                 //As Chrome does not support changing IceRole while renegotiating we need to keep same previous IceRole if we already negotiated before
                 else
                 {
-                    // Set DTLS role as client.
-                    IceRole = IceRolesEnum.active;
+                    // We received an OFFER, so we are the answerer. RFC 4145 §4.1 / RFC 5763 §5:
+                    // the answerer's DTLS role is determined by the offerer's a=setup. If the offer
+                    // requested setup:active the offerer is the DTLS client, so we MUST answer
+                    // setup:passive (DTLS server); if it requested setup:passive we answer active;
+                    // for the usual setup:actpass (or an absent attribute) we default to active
+                    // (DTLS client), preserving prior browser-interop behaviour.
+                    // Previously this hardcoded active, which collided with an offerer that
+                    // explicitly requested active (e.g. the SpawnWear watch / libpeer, forced to
+                    // DTLS client because mbedTLS server can't reassemble a fragmented ClientHello)
+                    // -> two DTLS clients both sending ClientHello -> unexpected_message(10).
+                    IceRole = remoteIceRole == IceRolesEnum.active ? IceRolesEnum.passive : IceRolesEnum.active;
                 }
 
                 if (remoteIceUser != null && remoteIcePassword != null)
