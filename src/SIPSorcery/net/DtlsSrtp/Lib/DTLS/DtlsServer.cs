@@ -95,6 +95,17 @@ namespace SIPSorcery.Net.SharpSRTP.DTLS
 
         protected override int[] GetSupportedCipherSuites()
         {
+            // ✅ BRANCHING ON OUR OWN CERTIFICATE IS CORRECT *HERE*, AND ONLY HERE. DO NOT "FIX" THIS TO
+            // MATCH DtlsClient.
+            //
+            // The SERVER presents the certificate, so the suite it selects must match that certificate's auth
+            // type - offering TLS_ECDHE_ECDSA_* while holding an RSA cert would be unusable. The CLIENT's list
+            // is the opposite case: it describes the certificate it will ACCEPT from the peer, so deriving it
+            // from our own cert type was a real defect and was changed to the union on 2026-09-08 (it silently
+            // rejected every peer of the other type with handshake_failure(40) after ICE connected).
+            //
+            // ⚠️ The two methods look identical and mean opposite things. Making them symmetric would
+            // reintroduce the bug on one side or break the other.
             if (CertificateSignatureAlgorithm == SignatureAlgorithm.rsa)
             {
                 return new int[]
