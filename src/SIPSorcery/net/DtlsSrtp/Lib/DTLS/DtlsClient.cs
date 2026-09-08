@@ -94,46 +94,41 @@ namespace SIPSorcery.Net.SharpSRTP.DTLS
 
         protected override int[] GetSupportedCipherSuites()
         {
-            // TODO: review
-            if (CertificateSignatureAlgorithm == SignatureAlgorithm.rsa)
+            // 🔴 A CLIENT'S CIPHER-SUITE LIST CONSTRAINS THE *PEER'S* CERTIFICATE, NOT ITS OWN.
+            //
+            // This used to branch on CertificateSignatureAlgorithm - OUR certificate - and offer only that
+            // auth family: RSA cert => only TLS_ECDHE_RSA_*, ECDSA cert => only TLS_ECDHE_ECDSA_*. But the
+            // suite's auth component describes the certificate the SERVER will present. Offering one family
+            // therefore rejects every peer whose certificate is the other type, and the handshake dies with
+            // handshake_failure(40) AFTER ICE has connected - which reads as a network problem and is not one.
+            //
+            // ⚠️ Browsers advertise BOTH families, which is why this is invisible until it is not: whether a
+            // given peer connects depends on which certificate type it happened to generate.
+            // MEASURED 2026-09-08: SpawnDev.WebTorrent's DESKTOP lane intermittently found ZERO peers on the
+            // public Sintel swarm - a different live-swarm test failing each sweep - while the BROWSER lane
+            // passed every time, and the Captain independently connected to seven WebRTC peers on that same
+            // swarm from the browser demo minutes later. Same signature as the two DTLS handshake_failure(40)
+            // cases already on record (SpawnWear/libpeer RSA server 2026-06-23, Reachy Mini/GStreamer RSA-2048
+            // server 2026-07-20).
+            //
+            // So: offer the UNION. Our own certificate type is irrelevant here - it matters only if the peer
+            // requests a client certificate, and that is negotiated by signature_algorithms, not by this list.
+            return new int[]
             {
-                return new int[]
-                {
-                    // TLS 1.3 cpihers
-                    //CipherSuite.TLS_AES_256_GCM_SHA384,
-                    //CipherSuite.TLS_AES_128_GCM_SHA256,
-                    //CipherSuite.TLS_CHACHA20_POLY1305_SHA256,
+                // ECDSA-authenticated (what most browsers present)
+                CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+                CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+                CipherSuite.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+                CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
+                CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384,
 
-                    // TLS 1.2 ciphers:
-                    CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-                    CipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-                    CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
-                    CipherSuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384,
-                    CipherSuite.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-                };
-            }
-            else if(CertificateSignatureAlgorithm == SignatureAlgorithm.ecdsa)
-            {
-                // ECDSA certificates require matching cipher suites
-                return new int[]
-                {
-                    // TLS 1.3 cpihers
-                    //CipherSuite.TLS_AES_256_GCM_SHA384,
-                    //CipherSuite.TLS_AES_128_GCM_SHA256,
-                    //CipherSuite.TLS_CHACHA20_POLY1305_SHA256,
-
-                    // TLS 1.2 ciphers:
-                    CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-                    CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-                    CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
-                    CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384,
-                    CipherSuite.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-                };
-            }
-            else
-            {
-                throw new NotSupportedException();
-            }
+                // RSA-authenticated (libpeer, GStreamer and other native stacks)
+                CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+                CipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+                CipherSuite.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+                CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
+                CipherSuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384,
+            };
         }
 
         public virtual DtlsTransport DoHandshake(out string handshakeError, DatagramTransport datagramTransport, DtlsRequest request = null)
