@@ -6,6 +6,27 @@ Format: version entries newest first, SpawnDev-fork lines only unless explicitly
 
 ---
 
+## [10.0.8] - SpawnDev fork - 2026-09-08
+
+### Fixed
+- **`DtlsClient.GetSupportedCipherSuites()` now offers BOTH auth families instead of only the one matching our own certificate.** It used to branch on `CertificateSignatureAlgorithm` - OUR certificate - and return only `TLS_ECDHE_RSA_*` for an RSA cert or only `TLS_ECDHE_ECDSA_*` for an ECDSA cert. A TLS client's cipher-suite list describes the certificate it is willing to ACCEPT FROM THE PEER; the suite's auth component names the SERVER's certificate type, not the client's. Offering one family therefore rejected every peer presenting the other type, and the handshake died with `handshake_failure(40)` AFTER ICE had already connected - which reads as a network fault and is not one. Now returns the union: 5 ECDSA-authenticated suites + 5 RSA-authenticated suites.
+- **`handshake_failure(40)` now names its most likely cause.** `NotifyAlertReceived` logs our certificate's signature algorithm and every suite we offered, with a one-line explanation that a client's list is about the peer's certificate. Previously the alert surfaced as a bare code.
+
+### Rationale
+Browsers advertise both families, so the bug is invisible until it is not - whether a given peer connects depends on which certificate type it happened to generate. MEASURED 2026-09-08: SpawnDev.WebTorrent's DESKTOP lane intermittently found ZERO peers on the public Sintel swarm (a different live-swarm test failing each sweep) while the BROWSER lane passed every time, and the Captain independently connected to seven WebRTC peers on that same swarm from the browser demo minutes later. Same signature as the two `handshake_failure(40)` cases already on record: SpawnWear/libpeer RSA server (2026-06-23) and Reachy Mini/GStreamer RSA-2048 server (2026-07-20), both previously "fixed" by forcing our own certificate to RSA - a workaround that this change makes unnecessary.
+
+### Verification
+Against the live Reachy Mini robot over the real network, one variable changed at a time:
+
+| our certificate | fix | RTP packets received |
+|---|---|---|
+| RSA | n/a (worked before) | 992 |
+| ECDSA | before | 0 |
+| ECDSA | after | 990 |
+
+### Note on `DtlsServer`
+`DtlsServer.GetCipherSuites()` branches on our own certificate and that is CORRECT there - a server's offered suites must match the certificate it will actually present. The asymmetry is documented in the source so the two are not "unified" by a later reader.
+
 ## [10.0.7] - SpawnDev fork - 2026-06-24
 
 ### Fixed
