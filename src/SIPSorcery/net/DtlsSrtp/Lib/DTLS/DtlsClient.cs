@@ -191,6 +191,27 @@ namespace SIPSorcery.Net.SharpSRTP.DTLS
                 Log.Debug("DTLS client received alert: " + AlertLevel.GetText(level) + ", " + AlertDescription.GetText(alertDescription));
             }
 
+            // 🔴 handshake_failure(40) FROM THE PEER ALMOST ALWAYS MEANS NO SHARED CIPHER SUITE - SAY SO.
+            //
+            // The peer sends this after seeing our ClientHello, so by far the most common cause is that none
+            // of the suites we offered matches the certificate it holds. Without naming the offer, this alert
+            // is indistinguishable from a network problem: it arrives AFTER ICE has connected, so everything
+            // upstream looks healthy and the investigation goes to the wrong place.
+            //
+            // ⚠️ MEASURED 2026-09-08 against a real Reachy Mini (GStreamer, RSA-2048): with an ECDSA cert we
+            // offered ECDSA-only suites and got exactly this alert and zero audio packets; offering the union
+            // gave 990 packets over the same link. That cost a long investigation which this one line ends.
+            if (alertDescription == AlertDescription.handshake_failure)
+            {
+                var offered = GetSupportedCipherSuites();
+                Log.Warn("DTLS handshake_failure(40) from the peer. This normally means NO SHARED CIPHER SUITE: "
+                    + "the peer's certificate does not match any suite we offered. Our certificate is "
+                    + CertificateSignatureAlgorithm + " and we offered " + offered.Length + " suite(s): "
+                    + string.Join(", ", Array.ConvertAll(offered, c => "0x" + c.ToString("X4")))
+                    + ". A client's suite list describes the certificate it will ACCEPT from the peer, so it "
+                    + "must cover both RSA and ECDSA auth - not just our own certificate's type.");
+            }
+
             TlsAlertTypesEnum alertType = TlsAlertTypesEnum.Unassigned;
             if (Enum.IsDefined(typeof(TlsAlertTypesEnum), (int)alertDescription))
             {
