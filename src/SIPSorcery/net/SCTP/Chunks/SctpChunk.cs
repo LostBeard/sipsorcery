@@ -62,7 +62,7 @@ namespace SIPSorcery.Net
         //AUTH = 15,
         //PKTDROP = 129,
         //RE_CONFIG = 130,
-        //FORWARDTSN = 192,
+        FORWARDTSN = 192,   // RFC 3758 (partial reliability). SpawnDev: parsed and honoured by the receiver.
         //ASCONF = 193,
         //ASCONF_ACK = 128,
     }
@@ -351,6 +351,8 @@ namespace SIPSorcery.Net
                         return SctpInitChunk.ParseChunk(buffer, posn);
                     case SctpChunkType.SHUTDOWN:
                         return SctpShutdownChunk.ParseChunk(buffer, posn);
+                    case SctpChunkType.FORWARDTSN:
+                        return SctpForwardTsnChunk.ParseChunk(buffer, posn);
                     default:
                         logger.LogDebug("TODO: Implement parsing logic for well known chunk type {ChunkType}.", (SctpChunkType)chunkType);
                         return ParseBaseChunk(buffer, posn);

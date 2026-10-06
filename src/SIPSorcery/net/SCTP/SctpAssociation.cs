@@ -563,6 +563,22 @@ namespace SIPSorcery.Net
                             _dataSender.GotSack(chunk as SctpSackChunk);
                             break;
 
+                        case SctpChunkType.FORWARDTSN:
+                            // SpawnDev: the peer abandoned chunks on a partially reliable channel (e.g. live video with
+                            // maxRetransmits = 0). Move the cumulative TSN past them; without this one lost chunk left a
+                            // permanent gap, and once later chunks ran beyond the receive window everything was ignored.
+                            var ftsnFrames = _dataReceiver.OnForwardTsn(chunk as SctpForwardTsnChunk);
+                            var ftsnSack = _dataReceiver.GetSackChunk();
+                            if (ftsnSack != null)
+                            {
+                                SendChunk(ftsnSack);
+                            }
+                            foreach (var frame in ftsnFrames)
+                            {
+                                OnData?.Invoke(frame);
+                            }
+                            break;
+
                         case var ct when ct == SctpChunkType.SHUTDOWN && State == SctpAssociationState.Established:
                             // TODO: Check outstanding data chunks.
                             var shutdownAck = new SctpChunk(SctpChunkType.SHUTDOWN_ACK);
@@ -729,6 +745,7 @@ namespace SIPSorcery.Net
                     ARwnd,
                     _numberOutboundStreams,
                     _numberInboundStreams);
+                initChunk.ForwardTsnSupported = true; // SpawnDev: we honour FORWARD TSN (see SctpDataReceiver.OnForwardTsn)
                 init.AddChunk(initChunk);
 
                 SetState(SctpAssociationState.CookieWait);

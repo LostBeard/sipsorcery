@@ -238,12 +238,16 @@ namespace SIPSorcery.Net.UnitTests
             Assert.Equal(7, sctpPkt.Header.DestinationPort);
             Assert.Equal(0U, sctpPkt.Header.VerificationTag);
             // Note the checksum can differ if there are any unrecognised parameters.
-            Assert.Equal(0xBE4AE6F5U, sctpPkt.Header.Checksum);
+            // SpawnDev: was 0xBE4AE6F5. This usrsctp INIT carries Forward-TSN-Supported (0xC000), which used to round
+            // trip as an unrecognised parameter in its original position; it is now a recognised flag written after
+            // the other parameters, so the serialised bytes (and checksum) differ while the meaning is the same.
+            Assert.Equal(0x52B9CB3DU, sctpPkt.Header.Checksum);
             Assert.Single(sctpPkt.Chunks);
             Assert.Contains(sctpPkt.Chunks, (chunk) => { return chunk.KnownType == SctpChunkType.INIT; });
 
             var initChunk = sctpPkt.Chunks.First() as SctpInitChunk;
 
+            Assert.True(initChunk.ForwardTsnSupported);
             Assert.Equal(0xe31c5536U, initChunk.InitiateTag);
             Assert.Equal(131072U, initChunk.ARwnd);
             Assert.Equal(10, initChunk.NumberOutboundStreams);

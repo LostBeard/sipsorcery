@@ -322,6 +322,97 @@ namespace SIPSorcery.Net
         }
 
         /// <summary>
+        /// Handler for a FORWARD TSN chunk (RFC 3758 3.6): the sender abandoned every chunk up to the new cumulative
+        /// TSN (partially reliable data, e.g. live video with maxRetransmits = 0), so treat them as received. Without
+        /// this a single lost chunk on such a channel left a permanent gap: the cumulative TSN never moved again, and
+        /// once later chunks were more than the receive window ahead of it they were all ignored.
+        /// </summary>
+        /// <returns>Ordered-stream frames that became deliverable because skipped sequence numbers no longer block them.</returns>
+        public List<SctpDataFrame> OnForwardTsn(SctpForwardTsnChunk forwardTsn)
+        {
+            var frames = new List<SctpDataFrame>();
+            if (forwardTsn == null)
+            {
+                return frames;
+            }
+
+            uint newCum = forwardTsn.NewCumulativeTSN;
+
+            unchecked
+            {
+                if (_inOrderReceiveCount > 0)
+                {
+                    if (!IsNewer(_lastInOrderTSN, newCum))
+                    {
+                        return frames; // old or repeated FORWARD TSN: nothing to skip
+                    }
+                }
+                else if (!IsNewerOrEqual(_initialTSN - 1, newCum))
+                {
+                    return frames; // points before the association's first TSN
+                }
+
+                logger.LogTrace("SCTP FORWARD TSN to {NewCumulativeTSN} (was {LastInOrderTSN}).", newCum, _lastInOrderTSN);
+
+                _lastInOrderTSN = newCum;
+                if (_inOrderReceiveCount == 0)
+                {
+                    _inOrderReceiveCount = 1;
+                }
+
+                // Out-of-order records and fragments at or below the new cumulative TSN are settled: the sender skipped
+                // the chunks they were waiting for (it abandons whole messages, so later fragments belong to later ones).
+                foreach (var tsn in _forwardTSN.Keys.Where(t => !IsNewer(newCum, t)).ToList())
+                {
+                    _forwardTSN.Remove(tsn);
+                }
+                foreach (var tsn in _fragmentedChunks.Keys.Where(t => !IsNewer(newCum, t)).ToList())
+                {
+                    _fragmentedChunks.Remove(tsn);
+                }
+
+                // Chunks already received just past the new point extend it as usual.
+                while (_forwardTSN.ContainsKey(_lastInOrderTSN + 1))
+                {
+                    _lastInOrderTSN++;
+                    _inOrderReceiveCount++;
+                    _forwardTSN.Remove(_lastInOrderTSN);
+                }
+
+                // Ordered streams: the skipped sequence number counts as delivered; queued frames after it can go.
+                foreach (var (streamID, seqNum) in forwardTsn.Streams)
+                {
+                    if (_streamLatestSeqNums.TryGetValue(streamID, out ushort latest) &&
+                        (short)(seqNum - latest) <= 0)
+                    {
+                        continue; // not newer than what was already delivered
+                    }
+
+                    _streamLatestSeqNums[streamID] = seqNum;
+
+                    if (_streamOutOfOrderFrames.TryGetValue(streamID, out var outOfOrder))
+                    {
+                        foreach (var stale in outOfOrder.Keys.Where(s => (short)(s - seqNum) <= 0).ToList())
+                        {
+                            outOfOrder.Remove(stale);
+                        }
+
+                        ushort next = (ushort)(seqNum + 1);
+                        while (outOfOrder.TryGetValue(next, out var nextFrame))
+                        {
+                            frames.Add(nextFrame);
+                            _streamLatestSeqNums[streamID] = next;
+                            outOfOrder.Remove(next);
+                            next++;
+                        }
+                    }
+                }
+            }
+
+            return frames;
+        }
+
+        /// <summary>
         /// Gets a SACK chunk that represents the current state of the receiver.
         /// </summary>
         /// <returns>A SACK chunk that can be sent to the remote peer to update the ACK TSN and

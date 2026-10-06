@@ -218,6 +218,7 @@ namespace SIPSorcery.Net
                 SctpAssociation.DEFAULT_NUMBER_OUTBOUND_STREAMS,
                 SctpAssociation.DEFAULT_NUMBER_INBOUND_STREAMS);
             initAckChunk.StateCookie = jsonBufferWithHMAC;
+            initAckChunk.ForwardTsnSupported = true; // SpawnDev: we honour FORWARD TSN (see SctpDataReceiver.OnForwardTsn)
             initAckChunk.UnrecognizedPeerParameters = initChunk.UnrecognizedPeerParameters;
 
             initAckPacket.AddChunk(initAckChunk);

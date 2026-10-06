@@ -41,7 +41,8 @@ namespace SIPSorcery.Net
         CookiePreservative = 9,
         HostNameAddress = 11,
         SupportedAddressTypes = 12,
-        EcnCapable = 32768
+        EcnCapable = 32768,
+        ForwardTsnSupported = 49152     // RFC 3758: the sender of this INIT / INIT ACK understands FORWARD TSN.
     }
 
     /// <summary>
@@ -119,6 +120,12 @@ namespace SIPSorcery.Net
         public List<SctpInitChunkParameterType> SupportedAddressTypes = new List<SctpInitChunkParameterType>();
 
         /// <summary>
+        /// RFC 3758: set when this endpoint (sending) or the peer (parsed) supports the FORWARD TSN chunk,
+        /// which a partially reliable sender uses to skip chunks it abandoned.
+        /// </summary>
+        public bool ForwardTsnSupported;
+
+        /// <summary>
         /// INIT ACK only. Mandatory. This parameter value MUST contain all the necessary state and
         /// parameter information required for the sender of this INIT ACK to create the association, 
         /// along with a Message Authentication Code (MAC). 
@@ -194,6 +201,11 @@ namespace SIPSorcery.Net
                     SctpPadding.PadTo4ByteBoundary(StateCookie.Length);
             }
 
+            if (ForwardTsnSupported)
+            {
+                len += SctpTlvChunkParameter.SCTP_PARAMETER_HEADER_LENGTH; // no value
+            }
+
             foreach (var unrecognised in UnrecognizedPeerParameters)
             {
                 len += SctpTlvChunkParameter.SCTP_PARAMETER_HEADER_LENGTH +
@@ -254,6 +266,11 @@ namespace SIPSorcery.Net
             {
                 varParams.Add(
                     new SctpTlvChunkParameter((ushort)SctpInitChunkParameterType.StateCookie, StateCookie));
+            }
+
+            if (ForwardTsnSupported)
+            {
+                varParams.Add(new SctpTlvChunkParameter((ushort)SctpInitChunkParameterType.ForwardTsnSupported, new byte[0]));
             }
 
             foreach (var unrecognised in UnrecognizedPeerParameters)
@@ -335,7 +352,9 @@ namespace SIPSorcery.Net
             int paramPosn = startPosn + FIXED_PARAMETERS_LENGTH;
             int paramsBufferLength = chunkLen - SCTP_CHUNK_HEADER_LENGTH - FIXED_PARAMETERS_LENGTH;
 
-            if (paramPosn < paramsBufferLength)
+            // SpawnDev: was "paramPosn < paramsBufferLength", which compared an absolute buffer position with a length,
+            // so a short INIT (e.g. one whose only parameter is Forward-TSN-Supported) had its parameters skipped.
+            if (paramsBufferLength > 0)
             {
                 bool stopProcessing = false;
 
@@ -376,6 +395,10 @@ namespace SIPSorcery.Net
                             break;
 
                         case (ushort)SctpInitChunkParameterType.EcnCapable:
+                            break;
+
+                        case (ushort)SctpInitChunkParameterType.ForwardTsnSupported:
+                            initChunk.ForwardTsnSupported = true;
                             break;
 
                         case (ushort)SctpInitChunkParameterType.StateCookie:
