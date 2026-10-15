@@ -392,6 +392,11 @@ namespace SIPSorcery.Net
             onnegotiationneeded += CancelOnNegotiationNeededTask;
 
             sctp = new RTCSctpTransport(SCTP_DEFAULT_PORT, SCTP_DEFAULT_PORT, _rtpIceChannel.RTPPort);
+            if (_configuration != null)
+            {
+                if (_configuration.X_SctpMaxBurst > 0) sctp.RTCSctpAssociation.MaxBurst = _configuration.X_SctpMaxBurst;
+                if (_configuration.X_SctpBurstPeriodMilliseconds > 0) sctp.RTCSctpAssociation.BurstPeriodMilliseconds = _configuration.X_SctpBurstPeriodMilliseconds;
+            }
 
             onnegotiationneeded?.Invoke();
 

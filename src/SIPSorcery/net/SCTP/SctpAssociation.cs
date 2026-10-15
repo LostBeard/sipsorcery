@@ -134,8 +134,18 @@ namespace SIPSorcery.Net
         /// </summary>
         public int MaxBurst
         {
-            get => _dataSender?._maxBurst ?? SctpDataSender.MAX_BURST;
-            set { if (_dataSender != null) _dataSender._maxBurst = value > 0 ? value : SctpDataSender.MAX_BURST; }
+            get => _dataSender?._maxBurst ?? (_maxBurstSetting > 0 ? _maxBurstSetting : SctpDataSender.MAX_BURST);
+            set { _maxBurstSetting = value > 0 ? value : 0; ApplyBurstSettings(); }
+        }
+
+        // The sender is created (and, for the side that receives the cookie, created late), so the settings are remembered here and applied to whichever sender exists.
+        private int _maxBurstSetting, _burstPeriodSetting;
+
+        private void ApplyBurstSettings()
+        {
+            if (_dataSender == null) return;
+            _dataSender._maxBurst = _maxBurstSetting > 0 ? _maxBurstSetting : SctpDataSender.MAX_BURST;
+            _dataSender._burstPeriodMilliseconds = _burstPeriodSetting > 0 ? _burstPeriodSetting : SctpDataSender.BURST_PERIOD_MILLISECONDS;
         }
 
         /// <summary>
@@ -147,8 +157,8 @@ namespace SIPSorcery.Net
         /// </summary>
         public int BurstPeriodMilliseconds
         {
-            get => _dataSender?._burstPeriodMilliseconds ?? SctpDataSender.BURST_PERIOD_MILLISECONDS;
-            set { if (_dataSender != null) _dataSender._burstPeriodMilliseconds = value > 0 ? value : SctpDataSender.BURST_PERIOD_MILLISECONDS; }
+            get => _dataSender?._burstPeriodMilliseconds ?? (_burstPeriodSetting > 0 ? _burstPeriodSetting : SctpDataSender.BURST_PERIOD_MILLISECONDS);
+            set { _burstPeriodSetting = value > 0 ? value : 0; ApplyBurstSettings(); }
         }
 
         public uint VerificationTag { get; private set; }
@@ -358,6 +368,7 @@ namespace SIPSorcery.Net
                 if (_dataSender == null)
                 {
                     _dataSender = new SctpDataSender(ID, this.SendChunk, _defaultMTU, cookie.TSN, cookie.RemoteARwnd);
+                    ApplyBurstSettings();
                 }
 
                 InitRemoteProperties(cookie.RemoteTag, cookie.RemoteTSN, cookie.RemoteARwnd);

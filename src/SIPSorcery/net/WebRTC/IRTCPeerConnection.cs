@@ -370,6 +370,16 @@ namespace SIPSorcery.Net
         public bool X_UseRsaForDtlsCertificate;
 
         /// <summary>
+        /// Chunks the SCTP sender may send per burst (0 = the RFC 4960 default of 4). The sender's throughput is capped at about <c>MaxBurst * 1300 B / RTT</c>, so the default
+        /// moves only ~170 KB/s on a LAN with a 30 ms round trip (measured 2026-10-15 uploading audio to a Reachy Mini). Raise it (32 to 64) for a peer known to be on the same LAN;
+        /// leave it for paths over the public internet.
+        /// </summary>
+        public int X_SctpMaxBurst;
+
+        /// <summary>Milliseconds the SCTP sender waits between bursts when no SACK wakes it (0 = the default 50). See <see cref="X_SctpMaxBurst"/>.</summary>
+        public int X_SctpBurstPeriodMilliseconds;
+
+        /// <summary>
         /// Timeout for gathering local IP addresses
         /// </summary>
         public int X_GatherTimeoutMs = 30000;
