@@ -358,8 +358,11 @@ namespace SIPSorcery.Net
         {
             if (!sendingFormatFound)
             {
+                // The format is only remembered once BOTH tracks exist: a sample sent before the remote description is applied (a source that starts at once, such as continuous
+            // silence) otherwise pins the LOCAL default (Opus 111) for the life of the stream, and the peer, which negotiated its own payload type (a Reachy Mini robot: 100),
+            // drops every packet.
                 sendingFormat = GetSendingFormat().ToVideoFormat();
-                sendingFormatFound = true;
+                sendingFormatFound = LocalTrack != null && RemoteTrack != null;
             }
 
             int payloadID = sendingFormat.FormatID;
