@@ -6,6 +6,26 @@ Format: version entries newest first, SpawnDev-fork lines only unless explicitly
 
 ---
 
+## [10.0.11] - SpawnDev fork - 2026-11-03
+
+### Added
+- **`RTCConfiguration.X_SctpMaxBurst` / `X_SctpBurstPeriodMilliseconds`.** The SCTP sender sends at most MaxBurst (4) chunks per
+  burst, so a data channel's throughput is about MaxBurst * 1300 B / RTT: a Reachy Mini data channel moved ~170 KB/s on a LAN where
+  plain TCP moved 6.6 MB/s. The values are a connection setting, remembered by the association and applied to whichever sender exists
+  (the side that receives the cookie creates its sender late). Defaults are unchanged. Measured on the robot: MaxBurst 32 + period
+  10 ms sent 400 KB in 350 ms instead of 2.3 s.
+
+### Fixed
+- **RTP streams pin their sending format only once both tracks are known.** Audio / video / text streams cached the format on the
+  first sample; a source that starts at once (continuous silence from the moment of connection) sends before the remote description
+  is applied, so the LOCAL default (Opus 111) was pinned for the life of the stream, and a peer that negotiated its own payload type
+  (a Reachy Mini offers Opus as 100) dropped every packet.
+
+## [10.0.10] - SpawnDev fork
+
+- SCTP: FORWARD TSN (RFC 3758) on the receive side; INIT parameter parsing fixed for short INITs. (Released to nuget.org; entry added
+  with 10.0.11.)
+
 ## [10.0.8] - SpawnDev fork - 2026-09-08
 
 ### Fixed
